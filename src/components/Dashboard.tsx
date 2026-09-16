@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Member, ShowDay, Show, RoleType, RoleAssignment, roleNames, roleColors, allRoles, isShowMissingRoles, getMissingRoles, getRequiredRoles, getTotalRequiredRoles } from '../types';
 import ShowDetailModal from './ShowDetailModal';
+import ThemeToggle from './ThemeToggle';
 
 interface DashboardProps {
   currentUser: Member;
@@ -102,6 +103,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           </div>
         </div>
         <div className="header-right">
+          <ThemeToggle />
           <div className="user-info">
             <span className="user-greeting">Xin chào,</span>
             <span className="user-name">{currentUser.name}</span>
