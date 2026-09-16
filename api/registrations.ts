@@ -20,44 +20,58 @@ export default async function handler(
     method: req.method
   };
 
+  // LUÔN trả 200 với JSON - không bao giờ throw 500
   try {
-    const hasKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+    const hasKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
     if (!hasKV) {
-      console.log('KV not configured:', debug);
       if (req.method === 'GET') {
         return res.status(200).json({ registrations: {}, kvConfigured: false, debug });
       }
-      if (req.method === 'POST') {
-        return res.status(200).json({ success: true, kvConfigured: false, note: 'Saved locally only', debug });
-      }
+      return res.status(200).json({ success: true, kvConfigured: false, debug, note: 'Saved locally only' });
     }
 
-    const { kv } = await import('@vercel/kv');
+    // Có KV - dùng dynamic import
+    let kv: any;
+    try {
+      const kvModule = await import('@vercel/kv');
+      kv = kvModule.kv;
+    } catch (importErr: any) {
+      console.error('KV import failed:', importErr?.message);
+      if (req.method === 'GET') {
+        return res.status(200).json({ registrations: {}, kvConfigured: false, debug, importError: importErr?.message });
+      }
+      return res.status(200).json({ success: true, kvConfigured: false, debug, importError: importErr?.message });
+    }
 
     if (req.method === 'GET') {
-      const registrations = (await kv.get('lan_registrations')) || {};
-      console.log('KV GET:', { count: Object.keys(registrations).length });
-      return res.status(200).json({ registrations, kvConfigured: true, debug });
+      try {
+        const registrations = (await kv.get('lan_registrations')) || {};
+        return res.status(200).json({ registrations, kvConfigured: true, debug });
+      } catch (kvErr: any) {
+        console.error('KV GET failed:', kvErr?.message);
+        return res.status(200).json({ registrations: {}, kvConfigured: false, debug, kvError: kvErr?.message });
+      }
     }
 
     if (req.method === 'POST') {
-      const { registrations } = req.body;
+      const { registrations } = req.body || {};
       if (!registrations || typeof registrations !== 'object') {
-        return res.status(400).json({ error: 'Invalid data' });
+        return res.status(200).json({ success: false, debug, error: 'Invalid data' });
       }
-      const count = Object.keys(registrations).length;
-      await kv.set('lan_registrations', registrations);
-      console.log('KV SET:', { count });
-      return res.status(200).json({ success: true, kvConfigured: true, count, debug });
+      try {
+        const count = Object.keys(registrations).length;
+        await kv.set('lan_registrations', registrations);
+        return res.status(200).json({ success: true, kvConfigured: true, count, debug });
+      } catch (kvErr: any) {
+        console.error('KV SET failed:', kvErr?.message);
+        return res.status(200).json({ success: true, kvConfigured: false, debug, kvError: kvErr?.message });
+      }
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
-  } catch (error: any) {
-    console.error('API Error:', error?.message || error, debug);
-    if (req.method === 'GET') {
-      return res.status(200).json({ registrations: {}, kvConfigured: false, error: error?.message, debug });
-    }
-    return res.status(200).json({ success: true, kvConfigured: false, note: 'local only', error: error?.message, debug });
+    return res.status(200).json({ error: 'Method not allowed', debug });
+  } catch (outerErr: any) {
+    console.error('Outer error:', outerErr?.message);
+    return res.status(200).json({ success: true, kvConfigured: false, debug, fatalError: outerErr?.message });
   }
 }
