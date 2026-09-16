@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 function ThemeToggle() {
   const [isDark, setIsDark] = useState<boolean>(() => {
     const stored = localStorage.getItem('lan_theme');
-    return stored ? stored === 'dark' : true; // Default to dark
+    return stored ? stored === 'dark' : false; // Default to light (false)
   });
 
   useEffect(() => {

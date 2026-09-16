@@ -13,11 +13,11 @@
       (function() {
         try {
           var theme = localStorage.getItem('lan_theme');
-          if (!theme) theme = 'dark'; // default dark
+          if (!theme) theme = 'light'; // default light
           document.documentElement.setAttribute('data-theme', theme);
           localStorage.setItem('lan_theme', theme);
         } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.setAttribute('data-theme', 'light');
         }
       })();
     </script>
