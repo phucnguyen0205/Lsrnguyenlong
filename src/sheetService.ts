@@ -282,7 +282,8 @@ export const saveRegistrations = async (registrations: Record<string, Show>) => 
       body: JSON.stringify({ registrations })
     });
     if (res.ok) {
-      console.log('Synced to server');
+      const data = await res.json();
+      console.log('[save] server response:', { kvConfigured: data.kvConfigured, count: data.count, debug: data.debug });
     }
   } catch (e) {
     // Im lặng - local đã lưu rồi
@@ -298,11 +299,12 @@ export const loadRegistrations = async (): Promise<Record<string, Show>> => {
     if (stored) local = JSON.parse(stored);
   } catch (e) {}
 
-  // 2. Thử merge với server (không bắt buộc)
+  // 2. Thử lấy từ server - LUÔN lấy nếu server có data
   try {
     const res = await fetch('/api/registrations');
     if (res.ok) {
       const data = await res.json();
+      console.log('[load] server response:', { kvConfigured: data.kvConfigured, count: Object.keys(data.registrations || {}).length, debug: data.debug });
       if (data.registrations && Object.keys(data.registrations).length > 0) {
         // Server có data - merge (server ưu tiên)
         const merged = { ...local, ...data.registrations };
@@ -310,7 +312,9 @@ export const loadRegistrations = async (): Promise<Record<string, Show>> => {
         return merged;
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[load] server error:', e);
+  }
 
   return local;
 };
