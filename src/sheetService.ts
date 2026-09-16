@@ -265,46 +265,52 @@ export const fetchSheetData = async (): Promise<ShowDay[]> => {
   }
 };
 
-// Lưu đăng ký lên server (Vercel KV) và localStorage làm backup
+// Lưu đăng ký - localStorage là nguồn chính, server là backup/sync
 export const saveRegistrations = async (registrations: Record<string, Show>) => {
-  // Backup local luôn
+  // 1. Lưu local LUÔN (kể cả khi server lỗi)
   try {
     localStorage.setItem('lan_registrations', JSON.stringify(registrations));
   } catch (e) {
     console.warn('localStorage save failed:', e);
   }
 
-  // Đồng bộ lên server
+  // 2. Thử sync lên server (không bắt buộc thành công)
   try {
     const res = await fetch('/api/registrations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ registrations })
     });
-    if (!res.ok) throw new Error('Server save failed');
-    console.log('Registrations synced to server');
+    if (res.ok) {
+      console.log('Synced to server');
+    }
   } catch (e) {
-    console.warn('Server save failed (will sync later):', e);
+    // Im lặng - local đã lưu rồi
   }
 };
 
-// Load đăng ký - ưu tiên server, fallback local
+// Load đăng ký - localStorage là nguồn chính
 export const loadRegistrations = async (): Promise<Record<string, Show>> => {
+  // 1. Lấy local trước
+  let local: Record<string, Show> = {};
+  try {
+    const stored = localStorage.getItem('lan_registrations');
+    if (stored) local = JSON.parse(stored);
+  } catch (e) {}
+
+  // 2. Thử merge với server (không bắt buộc)
   try {
     const res = await fetch('/api/registrations');
     if (res.ok) {
       const data = await res.json();
       if (data.registrations && Object.keys(data.registrations).length > 0) {
-        // Cập nhật local cache
-        localStorage.setItem('lan_registrations', JSON.stringify(data.registrations));
-        return data.registrations;
+        // Server có data - merge (server ưu tiên)
+        const merged = { ...local, ...data.registrations };
+        localStorage.setItem('lan_registrations', JSON.stringify(merged));
+        return merged;
       }
     }
-  } catch (e) {
-    console.warn('Server load failed, using local:', e);
-  }
+  } catch (e) {}
 
-  // Fallback: localStorage
-  const stored = localStorage.getItem('lan_registrations');
-  return stored ? JSON.parse(stored) : {};
+  return local;
 };
