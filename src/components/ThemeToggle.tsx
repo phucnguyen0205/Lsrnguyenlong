@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 function ThemeToggle() {
-  const [isDark, setIsDark] = useState(() => {
+  const [isDark, setIsDark] = useState<boolean>(() => {
     const stored = localStorage.getItem('lan_theme');
     return stored ? stored === 'dark' : true; // Default to dark
   });
@@ -10,6 +10,17 @@ function ThemeToggle() {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     localStorage.setItem('lan_theme', isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  // Lắng nghe thay đổi theme từ tab khác
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'lan_theme' && e.newValue) {
+        setIsDark(e.newValue === 'dark');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   return (
     <button
