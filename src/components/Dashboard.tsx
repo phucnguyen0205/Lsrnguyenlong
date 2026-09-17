@@ -451,7 +451,11 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
                     </div>
                     <div className="admin-roles-list">
                       {hasRegistrations ? (
-                        regShow.roles.map((reg, i) => (
+                        [...regShow.roles].sort((a, b) => {
+                          const roleOrder = allRoles.indexOf(a.role) - allRoles.indexOf(b.role);
+                          if (roleOrder !== 0) return roleOrder;
+                          return a.memberName.localeCompare(b.memberName, 'vi');
+                        }).map((reg, i) => (
                           <div key={i} className="admin-role-item" style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}>
                             <span className="admin-role-name">{reg.memberName}</span>
                             <span className="admin-role-type">{roleNames[reg.role]}</span>

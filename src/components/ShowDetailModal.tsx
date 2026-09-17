@@ -142,7 +142,11 @@ function ShowDetailModal({ show, currentUser, onRegister, onUnregister, onClose 
           <h4>Danh sách đăng ký ({show.roles.length})</h4>
           {show.roles.length > 0 ? (
             <div className="reg-items">
-              {show.roles.map((reg, i) => (
+              {[...show.roles].sort((a, b) => {
+                const roleOrder = allRoles.indexOf(a.role) - allRoles.indexOf(b.role);
+                if (roleOrder !== 0) return roleOrder;
+                return a.memberName.localeCompare(b.memberName, 'vi');
+              }).map((reg, i) => (
                 <div key={i} className="reg-item" style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}>
                   <span className="reg-name">{reg.memberName}</span>
                   <span className="reg-role">{roleNames[reg.role]}</span>
