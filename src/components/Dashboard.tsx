@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Member, ShowDay, Show, RoleType, RoleAssignment, roleNames, roleColors, allRoles, isShowMissingRoles, getMissingRoles, getRequiredRoles, getTotalRequiredRoles } from '../types';
 import ShowDetailModal from './ShowDetailModal';
+import AdminShowDetailModal from './AdminShowDetailModal';
 import ThemeToggle from './ThemeToggle';
 
 // Interface cho thông tin trùng giờ
@@ -69,11 +70,34 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
   const [selectedShow, setSelectedShow] = useState<{ dayId: string; show: Show } | null>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [adminDayIndex, setAdminDayIndex] = useState<number>(0);
+  const [adminModalShow, setAdminModalShow] = useState<{ dayId: string; show: Show } | null>(null);
   const [conflictWarning, setConflictWarning] = useState<ConflictInfo | null>(null);
   const [pendingRole, setPendingRole] = useState<RoleType | null>(null);
   const [myRegsCollapsed, setMyRegsCollapsed] = useState<boolean>(false);
+  // Real-time current time (cập nhật mỗi phút để filter show quá giờ)
+  const [now, setNow] = useState<Date>(new Date());
 
   const isAdmin = currentUser.role === 'admin';
+
+  // Update time mỗi 60s
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper: kiểm tra show đã qua giờ chưa
+  const isShowPast = (day: ShowDay, show: Show): boolean => {
+    // Parse "8h30" -> 8:30
+    const m = show.time.match(/^(\d{1,2})h(\d{0,2})$/);
+    if (!m) return false;
+    const hour = parseInt(m[1]);
+    const minute = m[2] ? parseInt(m[2]) : 0;
+    const showDate = new Date(day.date);
+    showDate.setHours(hour, minute, 0, 0);
+    // Quá giờ nếu thời điểm hiện tại > show + 2h
+    const twoHoursAfterShow = new Date(showDate.getTime() + 2 * 60 * 60 * 1000);
+    return now.getTime() > twoHoursAfterShow.getTime();
+  };
   
   // Get the currently selected day for main view
   const selectedDay = showDays[selectedDayIndex] || null;
@@ -449,10 +473,22 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           </div>
           
           {/* Admin Content for Selected Day */}
-          {adminSelectedDay && (
+          {adminSelectedDay && (() => {
+            const visibleShows = adminSelectedDay.shows.filter(show => !isShowPast(adminSelectedDay, show));
+            const hiddenCount = adminSelectedDay.shows.length - visibleShows.length;
+            return (
             <div className="admin-day-content">
               <h4>{adminSelectedDay.dayName} - {adminSelectedDay.dayOfWeek}</h4>
-              {adminSelectedDay.shows.map(show => {
+              {hiddenCount > 0 && (
+                <div className="admin-past-info">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12,6 12,12 16,14"/>
+                  </svg>
+                  Đã ẩn {hiddenCount} show đã qua giờ (quá 2h sau giờ diễn)
+                </div>
+              )}
+              {visibleShows.map(show => {
                 const regKey = `${adminSelectedDay.id}-${show.id}`;
                 const regShow = registrations[regKey] || show;
                 const hasRegistrations = regShow.roles.length > 0;
@@ -462,7 +498,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
                   <div 
                     key={show.id} 
                     className={`admin-show-item ${missingRolesList.length > 0 ? 'missing-roles' : ''}`}
-                    onClick={() => handleShowClick(adminSelectedDay.id, show)}
+                    onClick={() => setAdminModalShow({ dayId: adminSelectedDay.id, show })}
                   >
                     <div className="admin-show-info" onClick={(e) => e.stopPropagation()}>
                       <div className="admin-show-main">
@@ -480,7 +516,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
                           <span className="admin-show-phone">📞 {show.phone}</span>
                         )}
                       </div>
-                      <button className="admin-show-detail-btn" onClick={() => handleShowClick(adminSelectedDay.id, show)} title="Xem chi tiết">
+                      <button className="admin-show-detail-btn" onClick={() => setAdminModalShow({ dayId: adminSelectedDay.id, show })} title="Xem chi tiết">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                           <circle cx="12" cy="12" r="10"/>
                           <path d="M12 16v-4M12 8h.01"/>
@@ -507,7 +543,8 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -519,6 +556,15 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           onRegister={handleRegister}
           onUnregister={handleUnregister}
           onClose={() => { setSelectedShow(null); setConflictWarning(null); setPendingRole(null); }}
+        />
+      )}
+
+      {/* Admin Show Detail Modal (view-only) */}
+      {isAdmin && adminModalShow && (
+        <AdminShowDetailModal
+          show={adminModalShow.show}
+          dayDate={showDays.find(d => d.id === adminModalShow.dayId)?.dayName || ''}
+          onClose={() => setAdminModalShow(null)}
         />
       )}
 
@@ -1170,6 +1216,19 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           background: var(--bg-dark);
           border-radius: 8px;
           padding: 16px;
+        }
+
+        .admin-past-info {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(156, 39, 176, 0.15);
+          color: #CE93D8;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          margin-bottom: 12px;
+          border-left: 3px solid #9C27B0;
         }
 
         .admin-day-content h4 {
