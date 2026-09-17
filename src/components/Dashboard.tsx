@@ -71,6 +71,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
   const [adminDayIndex, setAdminDayIndex] = useState<number>(0);
   const [conflictWarning, setConflictWarning] = useState<ConflictInfo | null>(null);
   const [pendingRole, setPendingRole] = useState<RoleType | null>(null);
+  const [myRegsCollapsed, setMyRegsCollapsed] = useState<boolean>(false);
 
   const isAdmin = currentUser.role === 'admin';
   
@@ -375,16 +376,50 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
             .map((r: RoleAssignment) => ({ reg: r, show }));
         });
         return dayRegs.length > 0 && (
-          <div className="my-registrations">
-            <h3>Đăng ký của bạn - {selectedDay.dayName}</h3>
-            <div className="reg-list">
-              {dayRegs.map(({ reg, show }, i: number) => (
-                <div key={i} className="reg-item" style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}>
-                  <span className="reg-time">{show.time}</span>
-                  <span className="reg-role">{roleNames[reg.role]}</span>
-                </div>
-              ))}
+          <div className={`my-registrations ${myRegsCollapsed ? 'collapsed' : ''}`}>
+            <div className="my-regs-header" onClick={() => setMyRegsCollapsed(!myRegsCollapsed)}>
+              <h3>Đăng ký của bạn - {selectedDay.dayName}</h3>
+              <button 
+                className="toggle-btn" 
+                onClick={(e) => { e.stopPropagation(); setMyRegsCollapsed(!myRegsCollapsed); }}
+                aria-label={myRegsCollapsed ? 'Mở rộng' : 'Thu nhỏ'}
+              >
+                {myRegsCollapsed ? (
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>
+                  </svg>
+                )}
+              </button>
             </div>
+            {!myRegsCollapsed && (
+              <div className="reg-list">
+                {dayRegs.map(({ reg, show }, i: number) => (
+                  <div key={i} className="reg-item" style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}>
+                    <span className="reg-time">{show.time}</span>
+                    <span className="reg-role">{roleNames[reg.role]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {myRegsCollapsed && (
+              <div className="reg-icons">
+                {dayRegs.map(({ reg, show }, i: number) => (
+                  <div 
+                    key={i} 
+                    className="reg-icon" 
+                    style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}
+                    title={`${show.time} - ${roleNames[reg.role]}`}
+                  >
+                    <span className="icon-time">{show.time.split(':')[0]}h</span>
+                    <span className="icon-role-dot"></span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -923,12 +958,84 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           padding: 12px 16px;
           max-width: 250px;
           box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          transition: all 0.3s ease;
+        }
+
+        .my-registrations.collapsed {
+          padding: 8px 12px;
+        }
+
+        .my-regs-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          cursor: pointer;
+          user-select: none;
         }
 
         .my-registrations h3 {
           font-size: 0.8rem;
           color: var(--primary);
-          margin: 0 0 8px 0;
+          margin: 0;
+          flex: 1;
+        }
+
+        .toggle-btn {
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+
+        .toggle-btn:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+          background: rgba(255, 215, 0, 0.1);
+        }
+
+        .reg-icons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .reg-icon {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 6px 10px;
+          background: var(--bg-dark);
+          border-radius: 20px;
+          border: 1.5px solid var(--role-color);
+          cursor: pointer;
+          transition: transform 0.2s ease;
+        }
+
+        .reg-icon:hover {
+          transform: translateY(-2px);
+        }
+
+        .icon-time {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-light);
+        }
+
+        .icon-role-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--role-color);
+          box-shadow: 0 0 6px var(--role-color);
         }
 
         .reg-list {
