@@ -24,6 +24,7 @@ const findConflictingShow = (
   currentShowId: string,
   currentTime: string,
   showDays: ShowDay[],
+  registrations: Record<string, Show>,
   memberId: string
 ): ConflictInfo | null => {
   const currentMinutes = timeToMinutes(currentTime);
@@ -38,8 +39,15 @@ const findConflictingShow = (
       const showMinutes = timeToMinutes(show.time);
       if (showMinutes === currentMinutes) {
         // Cùng giờ - kiểm tra user đã đăng ký role nào trong show này chưa
-        const hasRegistered = show.roles.some(r => r.memberId === memberId);
-        if (hasRegistered) {
+        // Check 1: Trong showDays (khi chưa reload)
+        const hasRegisteredInShowDays = show.roles.some(r => r.memberId === memberId);
+        
+        // Check 2: Trong registrations (khi đã reload - showDays chưa có)
+        const regKey = `${day.id}-${show.id}`;
+        const regData = registrations[regKey];
+        const hasRegisteredInRegs = regData && regData.roles.some(r => r.memberId === memberId);
+        
+        if (hasRegisteredInShowDays || hasRegisteredInRegs) {
           return { show, dayId: day.id };
         }
       }
@@ -92,6 +100,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       show.id,
       show.time,
       showDays,
+      registrations,
       currentUser.id
     );
 
@@ -139,19 +148,25 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
   const handleForceRegister = () => {
     if (!selectedShow || !conflictWarning || !pendingRole) return;
     
-    // Hủy đăng ký show trùng giờ trước
-    const conflictDay = showDays.find(d => d.id === conflictWarning.dayId);
+    // Tìm show trùng giờ - ưu tiên từ registrations (sau reload), fallback sang showDays
+    const regKey = `${conflictWarning.dayId}-${conflictWarning.show.id}`;
+    let conflictShowData = registrations[regKey] || conflictWarning.show;
     
-    if (conflictDay) {
-      const conflictShow = conflictDay.shows.find(s => s.id === conflictWarning.show.id);
-      if (conflictShow) {
-        const newConflictShow = {
-          ...conflictShow,
-          roles: conflictShow.roles.filter(r => r.memberId !== currentUser.id)
-        };
-        onUpdateRegistration(conflictWarning.dayId, newConflictShow);
+    // Nếu registrations không có, lấy từ showDays
+    if (!registrations[regKey]) {
+      const conflictDay = showDays.find(d => d.id === conflictWarning.dayId);
+      if (conflictDay) {
+        const found = conflictDay.shows.find(s => s.id === conflictWarning.show.id);
+        if (found) conflictShowData = found;
       }
     }
+    
+    // Hủy đăng ký show trùng giờ
+    const newConflictShow = {
+      ...conflictShowData,
+      roles: conflictShowData.roles.filter(r => r.memberId !== currentUser.id)
+    };
+    onUpdateRegistration(conflictWarning.dayId, newConflictShow);
     
     // Đăng ký show mới
     const showToReg = selectedShow.show;
