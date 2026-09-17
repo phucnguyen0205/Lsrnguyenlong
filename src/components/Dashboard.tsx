@@ -24,7 +24,6 @@ const findConflictingShow = (
   currentShowId: string,
   currentTime: string,
   showDays: ShowDay[],
-  userRegistrations: Record<string, Show>,
   memberId: string
 ): ConflictInfo | null => {
   const currentMinutes = timeToMinutes(currentTime);
@@ -38,10 +37,9 @@ const findConflictingShow = (
       
       const showMinutes = timeToMinutes(show.time);
       if (showMinutes === currentMinutes) {
-        // Cùng giờ - kiểm tra user có đăng ký show này chưa
-        const regKey = `${day.id}-${show.id}`;
-        const existingReg = userRegistrations[regKey];
-        if (existingReg && existingReg.roles.some(r => r.memberId === memberId)) {
+        // Cùng giờ - kiểm tra user đã đăng ký role nào trong show này chưa
+        const hasRegistered = show.roles.some(r => r.memberId === memberId);
+        if (hasRegistered) {
           return { show, dayId: day.id };
         }
       }
@@ -94,7 +92,6 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       show.id,
       show.time,
       showDays,
-      registrations,
       currentUser.id
     );
 
@@ -102,8 +99,8 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       currentShow: show.showName,
       currentTime: show.time,
       dayId: selectedShow.dayId,
-      totalRegistrations: Object.keys(registrations).length,
-      conflicting: conflicting ? conflicting.show.showName : null
+      conflicting: conflicting ? conflicting.show.showName : null,
+      rolesInCurrentShow: show.roles.map(r => `${r.memberName}:${r.role}`)
     });
     
     if (conflicting) {
