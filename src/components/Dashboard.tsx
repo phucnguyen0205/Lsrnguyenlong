@@ -378,19 +378,25 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
         return dayRegs.length > 0 && (
           <div className={`my-registrations ${myRegsCollapsed ? 'collapsed' : ''}`}>
             <div className="my-regs-header" onClick={() => setMyRegsCollapsed(!myRegsCollapsed)}>
-              <h3>Đăng ký của bạn - {selectedDay.dayName}</h3>
+              {!myRegsCollapsed && (
+                <h3>Đăng ký của bạn - {selectedDay.dayName}</h3>
+              )}
               <button 
                 className="toggle-btn" 
                 onClick={(e) => { e.stopPropagation(); setMyRegsCollapsed(!myRegsCollapsed); }}
                 aria-label={myRegsCollapsed ? 'Mở rộng' : 'Thu nhỏ'}
+                title={myRegsCollapsed ? `${dayRegs.length} show đã đăng ký - Click để mở rộng` : 'Thu nhỏ'}
               >
                 {myRegsCollapsed ? (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-                  </svg>
+                  <>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                    </svg>
+                    <span className="toggle-count">{dayRegs.length}</span>
+                  </>
                 ) : (
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>
                   </svg>
                 )}
               </button>
@@ -401,21 +407,6 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
                   <div key={i} className="reg-item" style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}>
                     <span className="reg-time">{show.time}</span>
                     <span className="reg-role">{roleNames[reg.role]}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {myRegsCollapsed && (
-              <div className="reg-icons">
-                {dayRegs.map(({ reg, show }, i: number) => (
-                  <div 
-                    key={i} 
-                    className="reg-icon" 
-                    style={{ '--role-color': roleColors[reg.role] } as React.CSSProperties}
-                    title={`${show.time} - ${roleNames[reg.role]}`}
-                  >
-                    <span className="icon-time">{show.time.split(':')[0]}h</span>
-                    <span className="icon-role-dot"></span>
                   </div>
                 ))}
               </div>
@@ -962,7 +953,11 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
         }
 
         .my-registrations.collapsed {
-          padding: 8px 12px;
+          padding: 0;
+          background: transparent;
+          border: none;
+          box-shadow: none;
+          max-width: none;
         }
 
         .my-regs-header {
@@ -974,6 +969,10 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           user-select: none;
         }
 
+        .my-registrations.collapsed .my-regs-header {
+          justify-content: flex-start;
+        }
+
         .my-registrations h3 {
           font-size: 0.8rem;
           color: var(--primary);
@@ -982,60 +981,33 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
         }
 
         .toggle-btn {
-          background: transparent;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          padding: 4px;
+          background: var(--bg-card);
+          border: 1px solid var(--primary);
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: var(--text-muted);
+          color: var(--primary);
           cursor: pointer;
           transition: all 0.2s ease;
           flex-shrink: 0;
+          padding: 0;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          gap: 2px;
         }
 
         .toggle-btn:hover {
-          border-color: var(--primary);
-          color: var(--primary);
-          background: rgba(255, 215, 0, 0.1);
+          transform: scale(1.1);
+          background: var(--primary);
+          color: #1a1a2e;
         }
 
-        .reg-icons {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-top: 8px;
-        }
-
-        .reg-icon {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          padding: 6px 10px;
-          background: var(--bg-dark);
-          border-radius: 20px;
-          border: 1.5px solid var(--role-color);
-          cursor: pointer;
-          transition: transform 0.2s ease;
-        }
-
-        .reg-icon:hover {
-          transform: translateY(-2px);
-        }
-
-        .icon-time {
+        .toggle-count {
           font-size: 0.75rem;
           font-weight: 700;
-          color: var(--text-light);
-        }
-
-        .icon-role-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: var(--role-color);
-          box-shadow: 0 0 6px var(--role-color);
+          line-height: 1;
         }
 
         .reg-list {
