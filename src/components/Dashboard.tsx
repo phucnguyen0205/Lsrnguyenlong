@@ -459,21 +459,33 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
                 const missingRolesList = getMissingRoles(regShow);
                 
                 return (
-                  <div key={show.id} className={`admin-show-item ${missingRolesList.length > 0 ? 'missing-roles' : ''}`}>
-                    <div className="admin-show-info">
-                      <span className="admin-show-time">{show.time}</span>
-                      <span className="admin-show-name">{show.showName}</span>
-                      {show.lionCount > 0 && (
-                        <span className="admin-show-lions">{show.lionCount} lân</span>
-                      )}
-                      {missingRolesList.length > 0 && (
-                        <span className="admin-show-missing">
-                          Thiếu: {missingRolesList.map(m => `${roleNames[m.role]}(${m.current}/${m.required})`).join(', ')}
-                        </span>
-                      )}
-                      {show.phone && (
-                        <span className="admin-show-phone">📞 {show.phone}</span>
-                      )}
+                  <div 
+                    key={show.id} 
+                    className={`admin-show-item ${missingRolesList.length > 0 ? 'missing-roles' : ''}`}
+                    onClick={() => handleShowClick(adminSelectedDay.id, show)}
+                  >
+                    <div className="admin-show-info" onClick={(e) => e.stopPropagation()}>
+                      <div className="admin-show-main">
+                        <span className="admin-show-time">{show.time}</span>
+                        <span className="admin-show-name">{show.showName}</span>
+                        {show.lionCount > 0 && (
+                          <span className="admin-show-lions">{show.lionCount} lân</span>
+                        )}
+                        {missingRolesList.length > 0 && (
+                          <span className="admin-show-missing">
+                            Thiếu: {missingRolesList.map(m => `${roleNames[m.role]}(${m.current}/${m.required})`).join(', ')}
+                          </span>
+                        )}
+                        {show.phone && (
+                          <span className="admin-show-phone">📞 {show.phone}</span>
+                        )}
+                      </div>
+                      <button className="admin-show-detail-btn" onClick={() => handleShowClick(adminSelectedDay.id, show)} title="Xem chi tiết">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <path d="M12 16v-4M12 8h.01"/>
+                        </svg>
+                      </button>
                     </div>
                     <div className="admin-roles-list">
                       {hasRegistrations ? (
@@ -1174,6 +1186,14 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           padding: 12px;
           margin-bottom: 8px;
           border: 1px solid var(--border);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .admin-show-item:hover {
+          border-color: var(--primary);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(255, 215, 0, 0.2);
         }
 
         .admin-show-item.missing-roles {
@@ -1183,9 +1203,37 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
 
         .admin-show-info {
           display: flex;
-          flex-wrap: wrap;
+          align-items: flex-start;
+          justify-content: space-between;
           gap: 12px;
           margin-bottom: 8px;
+        }
+
+        .admin-show-main {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          flex: 1;
+        }
+
+        .admin-show-detail-btn {
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 6px;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .admin-show-detail-btn:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+          background: rgba(255, 215, 0, 0.1);
         }
 
         .admin-show-time {
