@@ -97,6 +97,14 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       registrations,
       currentUser.id
     );
+
+    console.log('🔍 Conflict check:', {
+      currentShow: show.showName,
+      currentTime: show.time,
+      dayId: selectedShow.dayId,
+      totalRegistrations: Object.keys(registrations).length,
+      conflicting: conflicting ? conflicting.show.showName : null
+    });
     
     if (conflicting) {
       setConflictWarning(conflicting);
