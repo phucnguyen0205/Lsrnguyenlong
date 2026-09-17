@@ -233,35 +233,109 @@ const parseCSVLine = (line: string): string[] => {
   return result;
 };
 
+// Cache key cho sheet data
+const SHEET_CACHE_KEY = 'lan_sheet_cache';
+const SHEET_CACHE_TIMESTAMP_KEY = 'lan_sheet_cache_timestamp';
+
+// Kiểm tra cache còn hạn không (unused - để tự refresh sau 5p)
+
+// Lưu cache
+const saveCache = (data: ShowDay[]) => {
+  try {
+    localStorage.setItem(SHEET_CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(SHEET_CACHE_TIMESTAMP_KEY, Date.now().toString());
+  } catch (e) {
+    console.warn('Cache save failed:', e);
+  }
+};
+
+// Load cache
+const loadCache = (): ShowDay[] | null => {
+  try {
+    const cached = localStorage.getItem(SHEET_CACHE_KEY);
+    if (cached) {
+      console.log('Loading sheet data from cache');
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.warn('Cache load failed:', e);
+  }
+  return null;
+};
+
 // Fetch dữ liệu từ Google Sheets
 export const fetchSheetData = async (): Promise<ShowDay[]> => {
   try {
-    const allDays: ShowDay[] = [];
-    
-    console.log('Fetching', SHEET_CONFIG.sheetUrls.length, 'sheets sequentially...');
-    
-    // Fetch tuần tự để đảm bảo thứ tự đúng
-    for (let i = 0; i < SHEET_CONFIG.sheetUrls.length; i++) {
-      const url = SHEET_CONFIG.sheetUrls[i];
-      const cacheBuster = `&t=${Date.now()}`;
-      const urlWithCacheBuster = url + cacheBuster;
+    // 1. Thử load từ cache TRƯỚC
+    const cached = loadCache();
+    if (cached && cached.length > 0) {
+      console.log('Using cached sheet data, will refresh in background');
       
-      console.log(`Fetching sheet ${i} (url: ${url})...`);
-      const text = await fetch(urlWithCacheBuster).then(res => res.text());
-      const days = parseCSV(text, i);
-      allDays.push(...days);
+      // Refresh background (không block)
+      refreshSheetDataBackground();
+      
+      return cached;
     }
-    
-    // Sắp xếp theo ngày
-    allDays.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    console.log('Total days parsed:', allDays.length);
-    allDays.forEach(d => console.log(`  ${d.dayName}: ${d.shows.length} shows`));
-    
-    return allDays;
+
+    // 2. Cache miss - fetch mới
+    console.log('No cache, fetching sheets...');
+    return await fetchSheetDataFresh();
+
   } catch (error) {
     console.error('Error fetching sheet data:', error);
     return [];
+  }
+};
+
+// Fetch fresh data (tuần tự hoặc song song)
+const fetchSheetDataFresh = async (): Promise<ShowDay[]> => {
+  const allDays: ShowDay[] = [];
+
+  // Fetch SONG SONG thay vì tuần tự
+  console.log('Fetching', SHEET_CONFIG.sheetUrls.length, 'sheets in parallel...');
+  
+  const fetchPromises = SHEET_CONFIG.sheetUrls.map((url, i) => {
+    const cacheBuster = `&t=${Date.now()}`;
+    return fetch(url + cacheBuster)
+      .then(res => res.text())
+      .then(text => parseCSV(text, i));
+  });
+
+  const results = await Promise.all(fetchPromises);
+  
+  // Merge kết quả
+  for (const days of results) {
+    allDays.push(...days);
+  }
+
+  // Sắp xếp theo ngày
+  allDays.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  // Lưu cache
+  saveCache(allDays);
+
+  console.log('Total days parsed:', allDays.length);
+  allDays.forEach(d => console.log(`  ${d.dayName}: ${d.shows.length} shows`));
+
+  return allDays;
+};
+
+// Refresh background (sau khi load từ cache)
+const refreshSheetDataBackground = async () => {
+  try {
+    // Chờ 1 chút để không block initial render
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    console.log('Background refreshing sheet data...');
+    const freshData = await fetchSheetDataFresh();
+    
+    if (freshData && freshData.length > 0) {
+      // Dispatch event để App cập nhật nếu cần
+      window.dispatchEvent(new CustomEvent('sheetDataRefreshed', { detail: freshData }));
+      console.log('Background refresh complete');
+    }
+  } catch (e) {
+    console.warn('Background refresh failed:', e);
   }
 };
 

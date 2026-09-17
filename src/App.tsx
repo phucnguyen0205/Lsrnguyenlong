@@ -54,6 +54,14 @@ function App() {
     };
     
     loadData();
+
+    // Listen for background refresh
+    const handleRefresh = (e: CustomEvent<ShowDay[]>) => {
+      console.log('Received background refresh, updating data...');
+      setShowDays(e.detail);
+    };
+    window.addEventListener('sheetDataRefreshed', handleRefresh as EventListener);
+    return () => window.removeEventListener('sheetDataRefreshed', handleRefresh as EventListener);
   }, []);
 
   const handleLogin = (user: Member) => {
