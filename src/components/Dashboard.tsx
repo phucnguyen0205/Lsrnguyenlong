@@ -99,11 +99,27 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     return now.getTime() > twoHoursAfterShow.getTime();
   };
   
+  // Helper: lọc bỏ show quá giờ khỏi một ngày
+  const filterActiveShows = (day: ShowDay): Show[] =>
+    day.shows.filter(show => !isShowPast(day, show));
+
+  // Admin: danh sách ngày còn show chưa qua giờ
+  const adminVisibleDays = showDays
+    .map(day => ({ ...day, shows: filterActiveShows(day) }))
+    .filter(day => day.shows.length > 0);
+
+  // Auto chỉnh adminDayIndex nếu index không hợp lệ
+  useEffect(() => {
+    if (adminDayIndex >= adminVisibleDays.length && adminVisibleDays.length > 0) {
+      setAdminDayIndex(Math.max(0, adminVisibleDays.length - 1));
+    }
+  }, [adminVisibleDays.length, adminDayIndex]);
+
   // Get the currently selected day for main view
   const selectedDay = showDays[selectedDayIndex] || null;
-  
+
   // Get the currently selected day for admin panel
-  const adminSelectedDay = showDays[adminDayIndex] || null;
+  const adminSelectedDay = adminVisibleDays[adminDayIndex] || null;
 
   // Check if a day has any show missing roles (for admin tabs)
   const hasDayMissingRoles = (day: ShowDay): boolean => {
@@ -453,42 +469,37 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           </div>
           
           {/* Admin Day Tabs */}
-          <div className="admin-tabs-container">
-            <div className="admin-tabs">
-              {showDays.map((day, index) => {
-                const hasMissing = hasDayMissingRoles(day);
-                return (
-                  <button
-                    key={day.id}
-                    className={`admin-tab ${adminDayIndex === index ? 'active' : ''} ${hasMissing ? 'missing-roles' : ''}`}
-                    onClick={() => setAdminDayIndex(index)}
-                  >
-                    <span className="admin-tab-day">{day.dayName}</span>
-                    <span className="admin-tab-weekday">{day.dayOfWeek}</span>
-                    {hasMissing && <span className="admin-tab-alert">⚠️</span>}
-                  </button>
-                );
-              })}
+          {adminVisibleDays.length === 0 ? (
+            <div className="admin-empty">
+              <p>Tất cả các show đã qua giờ. Không có dữ liệu để hiển thị.</p>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="admin-tabs-container">
+                <div className="admin-tabs">
+                  {adminVisibleDays.map((day, index) => {
+                    const hasMissing = hasDayMissingRoles(day);
+                    return (
+                      <button
+                        key={day.id}
+                        className={`admin-tab ${adminDayIndex === index ? 'active' : ''} ${hasMissing ? 'missing-roles' : ''}`}
+                        onClick={() => setAdminDayIndex(index)}
+                      >
+                        <span className="admin-tab-day">{day.dayName}</span>
+                        <span className="admin-tab-weekday">{day.dayOfWeek}</span>
+                        {hasMissing && <span className="admin-tab-alert">⚠️</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
           
           {/* Admin Content for Selected Day */}
           {adminSelectedDay && (() => {
-            const visibleShows = adminSelectedDay.shows.filter(show => !isShowPast(adminSelectedDay, show));
-            const hiddenCount = adminSelectedDay.shows.length - visibleShows.length;
             return (
             <div className="admin-day-content">
               <h4>{adminSelectedDay.dayName} - {adminSelectedDay.dayOfWeek}</h4>
-              {hiddenCount > 0 && (
-                <div className="admin-past-info">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12,6 12,12 16,14"/>
-                  </svg>
-                  Đã ẩn {hiddenCount} show đã qua giờ (quá 2h sau giờ diễn)
-                </div>
-              )}
-              {visibleShows.map(show => {
+              {adminSelectedDay.shows.map(show => {
                 const regKey = `${adminSelectedDay.id}-${show.id}`;
                 const regShow = registrations[regKey] || show;
                 const hasRegistrations = regShow.roles.length > 0;
@@ -545,6 +556,8 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
             </div>
             );
           })()}
+            </>
+          )}
         </div>
       )}
 
@@ -1229,6 +1242,15 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           font-size: 0.8rem;
           margin-bottom: 12px;
           border-left: 3px solid #9C27B0;
+        }
+
+        .admin-empty {
+          background: var(--bg-dark);
+          border-radius: 8px;
+          padding: 32px 16px;
+          text-align: center;
+          color: var(--text-muted);
+          font-size: 0.9rem;
         }
 
         .admin-day-content h4 {
