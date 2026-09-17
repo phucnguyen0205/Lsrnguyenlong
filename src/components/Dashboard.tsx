@@ -3,6 +3,53 @@ import { Member, ShowDay, Show, RoleType, RoleAssignment, roleNames, roleColors,
 import ShowDetailModal from './ShowDetailModal';
 import ThemeToggle from './ThemeToggle';
 
+// Interface cho thông tin trùng giờ
+interface ConflictInfo {
+  show: Show;
+  dayId: string;
+}
+
+// Chuyển giờ "20h30" -> số phút để so sánh
+const timeToMinutes = (time: string): number => {
+  const match = time.match(/^(\d{1,2})h(\d{0,2})$/i);
+  if (!match) return -1;
+  const hours = parseInt(match[1]);
+  const minutes = match[2] ? parseInt(match[2].padEnd(2, '0')) : 0;
+  return hours * 60 + minutes;
+};
+
+// Kiểm tra xem có show nào cùng giờ trong cùng ngày không
+const findConflictingShow = (
+  currentDayId: string,
+  currentShowId: string,
+  currentTime: string,
+  showDays: ShowDay[],
+  userRegistrations: Record<string, Show>,
+  memberId: string
+): ConflictInfo | null => {
+  const currentMinutes = timeToMinutes(currentTime);
+  if (currentMinutes < 0) return null;
+
+  for (const day of showDays) {
+    if (day.id !== currentDayId) continue; // Chỉ kiểm tra cùng ngày
+    
+    for (const show of day.shows) {
+      if (show.id === currentShowId) continue; // Bỏ qua chính mình
+      
+      const showMinutes = timeToMinutes(show.time);
+      if (showMinutes === currentMinutes) {
+        // Cùng giờ - kiểm tra user có đăng ký show này chưa
+        const regKey = `${day.id}-${show.id}`;
+        const existingReg = userRegistrations[regKey];
+        if (existingReg && existingReg.roles.some(r => r.memberId === memberId)) {
+          return { show, dayId: day.id };
+        }
+      }
+    }
+  }
+  return null;
+};
+
 interface DashboardProps {
   currentUser: Member;
   showDays: ShowDay[];
@@ -16,6 +63,8 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
   const [selectedShow, setSelectedShow] = useState<{ dayId: string; show: Show } | null>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [adminDayIndex, setAdminDayIndex] = useState<number>(0);
+  const [conflictWarning, setConflictWarning] = useState<ConflictInfo | null>(null);
+  const [pendingRole, setPendingRole] = useState<RoleType | null>(null);
 
   const isAdmin = currentUser.role === 'admin';
   
@@ -33,10 +82,27 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
 
   const handleShowClick = (dayId: string, show: Show) => {
     setSelectedShow({ dayId, show });
+    setConflictWarning(null);
   };
 
   const handleRegister = (show: Show, role: RoleType) => {
     if (!selectedShow) return;
+    
+    // Kiểm tra trùng giờ với show khác đã đăng ký
+    const conflicting = findConflictingShow(
+      selectedShow.dayId,
+      show.id,
+      show.time,
+      showDays,
+      registrations,
+      currentUser.id
+    );
+    
+    if (conflicting) {
+      setConflictWarning(conflicting);
+      setPendingRole(role);
+      return;
+    }
     
     const newShow = {
       ...show,
@@ -53,6 +119,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     
     onUpdateRegistration(selectedShow.dayId, newShow);
     setSelectedShow(null);
+    setConflictWarning(null);
   };
 
   const handleUnregister = (show: Show, role: RoleType) => {
@@ -62,6 +129,44 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       roles: show.roles.filter(r => !(r.memberId === currentUser.id && r.role === role))
     };
     onUpdateRegistration(selectedShow.dayId, newShow);
+  };
+  
+  const handleForceRegister = () => {
+    if (!selectedShow || !conflictWarning || !pendingRole) return;
+    
+    // Hủy đăng ký show trùng giờ trước
+    const conflictDay = showDays.find(d => d.id === conflictWarning.dayId);
+    
+    if (conflictDay) {
+      const conflictShow = conflictDay.shows.find(s => s.id === conflictWarning.show.id);
+      if (conflictShow) {
+        const newConflictShow = {
+          ...conflictShow,
+          roles: conflictShow.roles.filter(r => r.memberId !== currentUser.id)
+        };
+        onUpdateRegistration(conflictWarning.dayId, newConflictShow);
+      }
+    }
+    
+    // Đăng ký show mới
+    const showToReg = selectedShow.show;
+    const newShow = {
+      ...showToReg,
+      roles: [
+        ...showToReg.roles.filter(r => r.memberId !== currentUser.id),
+        {
+          memberId: currentUser.id,
+          memberName: currentUser.name,
+          role: pendingRole,
+          registeredAt: new Date().toISOString()
+        }
+      ]
+    };
+    
+    onUpdateRegistration(selectedShow.dayId, newShow);
+    setSelectedShow(null);
+    setConflictWarning(null);
+    setPendingRole(null);
   };
 
   return (
@@ -358,8 +463,28 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           currentUser={currentUser}
           onRegister={handleRegister}
           onUnregister={handleUnregister}
-          onClose={() => setSelectedShow(null)}
+          onClose={() => { setSelectedShow(null); setConflictWarning(null); setPendingRole(null); }}
         />
+      )}
+
+      {/* Conflict Warning Modal */}
+      {conflictWarning && (
+        <div className="conflict-overlay" onClick={() => setConflictWarning(null)}>
+          <div className="conflict-modal" onClick={e => e.stopPropagation()}>
+            <div className="conflict-icon">⚠️</div>
+            <h3>Trùng giờ diễn!</h3>
+            <p>Bạn đã đăng ký <strong>{conflictWarning.show.showName}</strong> lúc <strong>{conflictWarning.show.time}</strong>.</p>
+            <p>Bạn chỉ có thể đăng ký 1 show mỗi khung giờ.</p>
+            <div className="conflict-actions">
+              <button className="conflict-cancel" onClick={() => setConflictWarning(null)}>
+                Hủy bỏ
+              </button>
+              <button className="conflict-confirm" onClick={handleForceRegister}>
+                Đổi sang show mới
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`
@@ -1031,6 +1156,97 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
           color: var(--text-muted);
           font-size: 0.8rem;
           font-style: italic;
+        }
+
+        /* Conflict Warning Modal */
+        .conflict-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          backdrop-filter: blur(4px);
+        }
+
+        .conflict-modal {
+          background: var(--bg-card);
+          border-radius: 16px;
+          padding: 32px;
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+          border: 2px solid var(--error);
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          animation: conflictPop 0.3s ease;
+        }
+
+        @keyframes conflictPop {
+          from {
+            transform: scale(0.8);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        .conflict-icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+
+        .conflict-modal h3 {
+          color: var(--error);
+          margin: 0 0 16px 0;
+          font-size: 1.3rem;
+        }
+
+        .conflict-modal p {
+          color: var(--text);
+          margin: 8px 0;
+          line-height: 1.5;
+        }
+
+        .conflict-actions {
+          display: flex;
+          gap: 12px;
+          margin-top: 24px;
+          justify-content: center;
+        }
+
+        .conflict-cancel {
+          padding: 12px 24px;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          background: transparent;
+          color: var(--text);
+          cursor: pointer;
+          font-size: 0.95rem;
+          transition: all 0.2s;
+        }
+
+        .conflict-cancel:hover {
+          background: var(--bg-dark);
+        }
+
+        .conflict-confirm {
+          padding: 12px 24px;
+          border: none;
+          border-radius: 8px;
+          background: var(--error);
+          color: white;
+          cursor: pointer;
+          font-size: 0.95rem;
+          font-weight: 600;
+          transition: all 0.2s;
+        }
+
+        .conflict-confirm:hover {
+          opacity: 0.9;
+          transform: scale(1.02);
         }
 
         @media (max-width: 768px) {
