@@ -185,7 +185,7 @@ export const parseCSV = (csvText: string, dayIndex: number = 0): ShowDay[] => {
       const rowDay = parseInt(dateParts[0]);
       const rowMonth = parseInt(dateParts[1]);
       const showDate = `2026-${String(rowMonth).padStart(2, '0')}-${String(rowDay).padStart(2, '0')}`;
-      const dayOfWeek = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(showDate).getTime() % 7];
+      const dayOfWeek = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(showDate).getDay()];
       
       days.push({
         id: `day-${showDate}`,
