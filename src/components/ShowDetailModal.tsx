@@ -4,7 +4,7 @@ import { Member, Show, RoleType, roleNames, roleColors, allRoles, getRequiredRol
 interface ShowDetailModalProps {
   show: Show;
   currentUser: Member;
-  onRegister: (show: Show, role: RoleType) => void;
+  onRegister: (show: Show, role: RoleType) => boolean;
   onUnregister: (show: Show, role: RoleType) => void;
   onClose: () => void;
 }
@@ -22,8 +22,12 @@ function ShowDetailModal({ show, currentUser, onRegister, onUnregister, onClose 
   
   const handleConfirm = () => {
     if (selectedRole) {
-      onRegister(show, selectedRole);
-      onClose();
+      // Gọi onRegister - trả về true nếu thành công, false nếu có conflict
+      const success = onRegister(show, selectedRole);
+      if (success) {
+        onClose();
+      }
+      // Nếu có conflict, conflict modal sẽ hiện ra
     }
   };
   

@@ -91,8 +91,8 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     setConflictWarning(null);
   };
 
-  const handleRegister = (show: Show, role: RoleType) => {
-    if (!selectedShow) return;
+  const handleRegister = (show: Show, role: RoleType): boolean => {
+    if (!selectedShow) return false;
     
     // Kiểm tra trùng giờ với show khác đã đăng ký
     const conflicting = findConflictingShow(
@@ -103,19 +103,11 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       registrations,
       currentUser.id
     );
-
-    console.log('🔍 Conflict check:', {
-      currentShow: show.showName,
-      currentTime: show.time,
-      dayId: selectedShow.dayId,
-      conflicting: conflicting ? conflicting.show.showName : null,
-      rolesInCurrentShow: show.roles.map(r => `${r.memberName}:${r.role}`)
-    });
     
     if (conflicting) {
       setConflictWarning(conflicting);
       setPendingRole(role);
-      return;
+      return false; // Có conflict - không đóng modal
     }
     
     const newShow = {
@@ -134,6 +126,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     onUpdateRegistration(selectedShow.dayId, newShow);
     setSelectedShow(null);
     setConflictWarning(null);
+    return true; // Thành công
   };
 
   const handleUnregister = (show: Show, role: RoleType) => {
