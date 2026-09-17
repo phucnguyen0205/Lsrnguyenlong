@@ -108,6 +108,11 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     .map(day => ({ ...day, shows: filterActiveShows(day) }))
     .filter(day => day.shows.length > 0);
 
+  // User: danh sách ngày còn show chưa qua giờ
+  const userVisibleDays = showDays
+    .map(day => ({ ...day, shows: filterActiveShows(day) }))
+    .filter(day => day.shows.length > 0);
+
   // Auto chỉnh adminDayIndex nếu index không hợp lệ
   useEffect(() => {
     if (adminDayIndex >= adminVisibleDays.length && adminVisibleDays.length > 0) {
@@ -115,8 +120,15 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     }
   }, [adminVisibleDays.length, adminDayIndex]);
 
+  // Auto chỉnh selectedDayIndex nếu index không hợp lệ
+  useEffect(() => {
+    if (selectedDayIndex >= userVisibleDays.length && userVisibleDays.length > 0) {
+      setSelectedDayIndex(Math.max(0, userVisibleDays.length - 1));
+    }
+  }, [userVisibleDays.length, selectedDayIndex]);
+
   // Get the currently selected day for main view
-  const selectedDay = showDays[selectedDayIndex] || null;
+  const selectedDay = userVisibleDays[selectedDayIndex] || null;
 
   // Get the currently selected day for admin panel
   const adminSelectedDay = adminVisibleDays[adminDayIndex] || null;
@@ -282,7 +294,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
       {!isAdmin && (
         <div className="day-tabs-container">
           <div className="day-tabs">
-            {showDays.map((day, index) => {
+            {userVisibleDays.map((day, index) => {
               const date = new Date(day.date);
               const isToday = new Date().toDateString() === date.toDateString();
               const hasMissing = isAdmin && hasDayMissingRoles(day);
