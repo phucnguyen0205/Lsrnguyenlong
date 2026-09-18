@@ -88,7 +88,12 @@ function App() {
       });
       if (existingKey) {
         key = existingKey;
+        console.log('[updateRegistration] Fallback to existing key:', key);
+      } else {
+        console.log('[updateRegistration] NEW key (no existing match):', key);
       }
+    } else {
+      console.log('[updateRegistration] Using key:', key, 'roles:', show.roles.length);
     }
     
     const newRegs = { ...registrations, [key]: show };
