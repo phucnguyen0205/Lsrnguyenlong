@@ -381,7 +381,40 @@ export const loadRegistrations = async (): Promise<Record<string, Show>> => {
       console.log('[load] server response:', { kvConfigured: data.kvConfigured, count: Object.keys(data.registrations || {}).length, debug: data.debug });
       if (data.registrations && Object.keys(data.registrations).length > 0) {
         // Server có data - merge (server ưu tiên)
-        const merged = { ...local, ...data.registrations };
+        let merged = { ...local, ...data.registrations };
+
+        // Dedup: nếu có 2 key cùng showName+dayId, giữ lại key có roles.length lớn nhất
+        const seen = new Map<string, string>();
+        const deduped: Record<string, Show> = {};
+        for (const [k, v] of Object.entries(merged)) {
+          if (!v?.showName) {
+            deduped[k] = v;
+            continue;
+          }
+          const dayId = k.split('-').slice(0, 3).join('-');
+          const dedupKey = `${dayId}|${v.showName}`;
+          const existing = seen.get(dedupKey);
+          if (!existing) {
+            seen.set(dedupKey, k);
+            deduped[k] = v;
+          } else {
+            // Có entry cũ - giữ entry có nhiều roles hơn
+            if ((v.roles?.length || 0) > (deduped[existing]?.roles?.length || 0)) {
+              delete deduped[existing];
+              seen.set(dedupKey, k);
+              deduped[k] = v;
+              console.log('[load] Dedup: replaced', existing, 'with', k);
+            } else {
+              console.log('[load] Dedup: dropped', k, '(keep', existing, ')');
+            }
+          }
+        }
+        if (Object.keys(deduped).length < Object.keys(merged).length) {
+          console.log('[load] Deduped:', Object.keys(merged).length, '->', Object.keys(deduped).length);
+          localStorage.setItem('lan_registrations', JSON.stringify(deduped));
+          return deduped;
+        }
+
         localStorage.setItem('lan_registrations', JSON.stringify(merged));
         return merged;
       }
