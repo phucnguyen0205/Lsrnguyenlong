@@ -32,19 +32,10 @@ function remapRegistrations(regs: Record<string, Show>, showDays: ShowDay[]): Re
     const dayId = k.split('-').slice(0, 3).join('-');
 
     // Thử match với key dayId|time|showName trước
-    let newShow = byKey.get(`${dayId}|${v.time}|${v.showName}`);
-    let matchedByName = false;
-
-    // Nếu không khớp, tìm bằng dayId|showName (fallback)
-    if (!newShow) {
-      const candidates = Array.from(byKey.entries()).filter(([key]) =>
+    const newShow = byKey.get(`${dayId}|${v.time}|${v.showName}`)
+      ?? Array.from(byKey.entries()).find(([key]) =>
         key.startsWith(dayId + '|') && key.endsWith('|' + v.showName)
-      );
-      if (candidates.length > 0) {
-        newShow = candidates[0][1];
-        matchedByName = true;
-      }
-    }
+      )?.[1];
 
     if (newShow) {
       const newKey = `${dayId}-${newShow.id}`;
