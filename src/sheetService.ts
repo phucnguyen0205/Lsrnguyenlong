@@ -340,7 +340,7 @@ const refreshSheetDataBackground = async () => {
 };
 
 // Lưu đăng ký - localStorage là nguồn chính, server là backup/sync
-export const saveRegistrations = async (registrations: Record<string, Show>) => {
+export const saveRegistrations = async (registrations: Record<string, Show>): Promise<number> => {
   // 1. Lưu local LUÔN (kể cả khi server lỗi)
   try {
     localStorage.setItem('lan_registrations', JSON.stringify(registrations));
@@ -358,10 +358,12 @@ export const saveRegistrations = async (registrations: Record<string, Show>) => 
     if (res.ok) {
       const data = await res.json();
       console.log('[save] server response:', { kvConfigured: data.kvConfigured, count: data.count, debug: data.debug });
+      return data.count || 0;
     }
   } catch (e) {
     // Im lặng - local đã lưu rồi
   }
+  return 0;
 };
 
 // Load đăng ký - localStorage là nguồn chính
@@ -381,41 +383,24 @@ export const loadRegistrations = async (): Promise<Record<string, Show>> => {
       console.log('[load] server response:', { kvConfigured: data.kvConfigured, count: Object.keys(data.registrations || {}).length, debug: data.debug });
       if (data.registrations && Object.keys(data.registrations).length > 0) {
         // Server có data - merge (server ưu tiên)
-        let merged = { ...local, ...data.registrations };
-
-        // Dedup: nếu có 2 key cùng showName+dayId, giữ lại key có roles.length lớn nhất
-        const seen = new Map<string, string>();
-        const deduped: Record<string, Show> = {};
-        for (const [k, v] of Object.entries(merged)) {
-          const show = v as Show;
-          if (!show?.showName) {
-            deduped[k] = show;
-            continue;
-          }
-          const dayId = k.split('-').slice(0, 3).join('-');
-          const dedupKey = `${dayId}|${show.showName}`;
-          const existing = seen.get(dedupKey);
-          if (!existing) {
-            seen.set(dedupKey, k);
-            deduped[k] = show;
-          } else {
-            // Có entry cũ - giữ entry có nhiều roles hơn
-            if ((show.roles?.length || 0) > (deduped[existing]?.roles?.length || 0)) {
-              delete deduped[existing];
-              seen.set(dedupKey, k);
-              deduped[k] = show;
-              console.log('[load] Dedup: replaced', existing, 'with', k);
-            } else {
-              console.log('[load] Dedup: dropped', k, '(keep', existing, ')');
+        // Merge roles cho cùng key thay vì ghi đè
+        const merged: Record<string, Show> = { ...local };
+        for (const [k, v] of Object.entries(data.registrations)) {
+          const serverShow = v as Show;
+          const localShow = merged[k];
+          if (localShow) {
+            // Merge roles: thêm roles từ server mà chưa có trong local
+            const mergedRoles = [...localShow.roles];
+            for (const r of serverShow.roles || []) {
+              if (!mergedRoles.some(m => m.memberId === r.memberId && m.role === r.role)) {
+                mergedRoles.push(r);
+              }
             }
+            merged[k] = { ...serverShow, roles: mergedRoles };
+          } else {
+            merged[k] = serverShow;
           }
         }
-        if (Object.keys(deduped).length < Object.keys(merged).length) {
-          console.log('[load] Deduped:', Object.keys(merged).length, '->', Object.keys(deduped).length);
-          localStorage.setItem('lan_registrations', JSON.stringify(deduped));
-          return deduped;
-        }
-
         localStorage.setItem('lan_registrations', JSON.stringify(merged));
         return merged;
       }

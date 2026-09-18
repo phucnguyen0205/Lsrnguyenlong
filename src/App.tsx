@@ -139,6 +139,7 @@ function App() {
 
   const updateRegistration = async (dayId: string, show: Show) => {
     const key = `${dayId}-${show.id}`;
+    console.log('[updateRegistration] key:', key, 'roles:', show.roles.length);
     const newRegs = { ...registrations, [key]: show };
     setRegistrations(newRegs);
 
@@ -154,7 +155,8 @@ function App() {
     }));
 
     // Lưu lên server + local
-    await saveRegistrations(newRegs);
+    const savedCount = await saveRegistrations(newRegs);
+    console.log('[updateRegistration] saved. local keys:', Object.keys(newRegs).length, 'server count:', savedCount);
   };
 
   if (isLoading) {
