@@ -387,22 +387,23 @@ export const loadRegistrations = async (): Promise<Record<string, Show>> => {
         const seen = new Map<string, string>();
         const deduped: Record<string, Show> = {};
         for (const [k, v] of Object.entries(merged)) {
-          if (!v?.showName) {
-            deduped[k] = v;
+          const show = v as Show;
+          if (!show?.showName) {
+            deduped[k] = show;
             continue;
           }
           const dayId = k.split('-').slice(0, 3).join('-');
-          const dedupKey = `${dayId}|${v.showName}`;
+          const dedupKey = `${dayId}|${show.showName}`;
           const existing = seen.get(dedupKey);
           if (!existing) {
             seen.set(dedupKey, k);
-            deduped[k] = v;
+            deduped[k] = show;
           } else {
             // Có entry cũ - giữ entry có nhiều roles hơn
-            if ((v.roles?.length || 0) > (deduped[existing]?.roles?.length || 0)) {
+            if ((show.roles?.length || 0) > (deduped[existing]?.roles?.length || 0)) {
               delete deduped[existing];
               seen.set(dedupKey, k);
-              deduped[k] = v;
+              deduped[k] = show;
               console.log('[load] Dedup: replaced', existing, 'with', k);
             } else {
               console.log('[load] Dedup: dropped', k, '(keep', existing, ')');
