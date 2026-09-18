@@ -6,6 +6,66 @@ import { Member, Show, ShowDay } from './types';
 import { members as initialMembers } from './types';
 import { fetchSheetData, loadRegistrations, saveRegistrations } from './sheetService';
 
+// Remap registrations: dùng ID mới từ showDays làm chuẩn
+// - Nếu key mới (dayId-show.id) đã tồn tại → giữ
+// - Nếu không, tìm key cũ cùng dayId+showName → chuyển sang key mới (merge roles)
+function remapRegistrations(regs: Record<string, Show>, showDays: ShowDay[]): Record<string, Show> {
+  const result: Record<string, Show> = {};
+  let remapped = 0;
+
+  // Build map: dayId|showName -> Show mới nhất
+  const byShowName = new Map<string, Show>();
+  for (const day of showDays) {
+    for (const show of day.shows) {
+      byShowName.set(`${day.id}|${show.showName}`, show);
+    }
+  }
+
+  // Bước 1: copy các entry đã có key mới
+  for (const [k, v] of Object.entries(regs)) {
+    const dayId = k.split('-').slice(0, 3).join('-');
+    const newShow = byShowName.get(`${dayId}|${v.showName}`);
+    if (newShow) {
+      const newKey = `${dayId}-${newShow.id}`;
+      if (newKey === k) {
+        // Đã là key mới
+        result[k] = v;
+      } else {
+        // Key cũ - merge roles với entry mới (nếu có)
+        const existing = result[newKey];
+        if (existing) {
+          const mergedRoles = [...existing.roles];
+          for (const r of v.roles) {
+            if (!mergedRoles.some(m => m.memberId === r.memberId && m.role === r.role)) {
+              mergedRoles.push(r);
+            }
+          }
+          result[newKey] = { ...existing, roles: mergedRoles };
+        } else {
+          result[newKey] = { ...newShow, roles: v.roles };
+        }
+        remapped++;
+      }
+    } else {
+      // Không tìm thấy show - giữ entry cũ
+      result[k] = v;
+    }
+  }
+
+  // Bước 2: thêm các show mới chưa có trong registrations (nếu có roles)
+  for (const [key, show] of byShowName.entries()) {
+    const newKey = `${show.id && key.split('|')[0]}-${show.id}`;
+    if (!result[newKey] && show.roles.length > 0) {
+      result[newKey] = show;
+    }
+  }
+
+  if (remapped > 0) {
+    console.log('[remap] Remapped', remapped, 'entries to new keys');
+  }
+  return result;
+}
+
 export interface AppState {
   currentUser: Member | null;
   showDays: ShowDay[];
@@ -36,12 +96,14 @@ function App() {
       // Load registrations từ server (ưu tiên) hoặc localStorage
       const savedRegs = await loadRegistrations();
       setRegistrations(savedRegs);
-      
+
       // Fetch sheet data
       try {
         const data = await fetchSheetData();
         if (data.length > 0) {
           setShowDays(data);
+          // Remap registrations theo ID mới từ showDays (fix key cũ vs mới)
+          setRegistrations(prev => remapRegistrations(prev, data));
         } else {
           setError('Không có dữ liệu show nào');
         }
@@ -49,16 +111,17 @@ function App() {
         console.error('Error fetching sheet:', err);
         setError('Không thể kết nối Google Sheets');
       }
-      
+
       setIsLoading(false);
     };
-    
+
     loadData();
 
     // Listen for background refresh
     const handleRefresh = (e: CustomEvent<ShowDay[]>) => {
       console.log('Received background refresh, updating data...');
       setShowDays(e.detail);
+      setRegistrations(prev => remapRegistrations(prev, e.detail));
     };
     window.addEventListener('sheetDataRefreshed', handleRefresh as EventListener);
     return () => window.removeEventListener('sheetDataRefreshed', handleRefresh as EventListener);
@@ -75,27 +138,7 @@ function App() {
   };
 
   const updateRegistration = async (dayId: string, show: Show) => {
-    // Tìm key trong registrations - có thể dùng ID cũ hoặc mới
-    // Ưu tiên dùng show.id mới, fallback tìm theo showName (cho data cũ)
-    let key = `${dayId}-${show.id}`;
-    
-    // Nếu key mới không tồn tại, tìm key cũ bằng showName
-    if (!registrations[key]) {
-      const existingKey = Object.keys(registrations).find(k => {
-        if (!k.startsWith(dayId + '-')) return false;
-        const reg = registrations[k];
-        return reg?.showName === show.showName;
-      });
-      if (existingKey) {
-        key = existingKey;
-        console.log('[updateRegistration] Fallback to existing key:', key);
-      } else {
-        console.log('[updateRegistration] NEW key (no existing match):', key);
-      }
-    } else {
-      console.log('[updateRegistration] Using key:', key, 'roles:', show.roles.length);
-    }
-    
+    const key = `${dayId}-${show.id}`;
     const newRegs = { ...registrations, [key]: show };
     setRegistrations(newRegs);
 
