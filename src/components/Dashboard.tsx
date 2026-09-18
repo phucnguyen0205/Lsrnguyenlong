@@ -146,10 +146,7 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
 
   const handleRegister = (show: Show, role: RoleType): boolean => {
     if (!selectedShow) return false;
-    
-    console.log('[handleRegister] show.id:', show.id, 'dayId:', selectedShow.dayId);
-    console.log('[handleRegister] current roles:', show.roles.length);
-    
+
     // Kiểm tra trùng giờ với show khác đã đăng ký
     const conflicting = findConflictingShow(
       selectedShow.dayId,
@@ -161,7 +158,6 @@ function Dashboard({ currentUser, showDays, registrations, onLogout, onUpdateReg
     );
 
     if (conflicting) {
-      console.log('[handleRegister] CONFLICT found:', conflicting);
       setConflictWarning(conflicting);
       setPendingRole(role);
       return false; // Có conflict - không đóng modal

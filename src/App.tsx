@@ -75,7 +75,22 @@ function App() {
   };
 
   const updateRegistration = async (dayId: string, show: Show) => {
-    const key = `${dayId}-${show.id}`;
+    // Tìm key trong registrations - có thể dùng ID cũ hoặc mới
+    // Ưu tiên dùng show.id mới, fallback tìm theo showName (cho data cũ)
+    let key = `${dayId}-${show.id}`;
+    
+    // Nếu key mới không tồn tại, tìm key cũ bằng showName
+    if (!registrations[key]) {
+      const existingKey = Object.keys(registrations).find(k => {
+        if (!k.startsWith(dayId + '-')) return false;
+        const reg = registrations[k];
+        return reg?.showName === show.showName;
+      });
+      if (existingKey) {
+        key = existingKey;
+      }
+    }
+    
     const newRegs = { ...registrations, [key]: show };
     setRegistrations(newRegs);
 
