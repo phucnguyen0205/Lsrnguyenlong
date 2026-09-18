@@ -150,9 +150,18 @@ export const parseCSV = (csvText: string, dayIndex: number = 0): ShowDay[] => {
     // Parse số lân (lấy số đầu tiên trong chuỗi)
     const lionCountMatch = lionCount.match(/\d+/);
     const parsedLionCount = lionCountMatch ? parseInt(lionCountMatch[0]) : 1;
-    
+
+    // Stable ID dựa trên date+time+name (chỉ phụ thuộc nội dung)
+    const stableId = `${dayDate || rowDate}-${time}-${showName}`
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 50);
+
     const show: Show = {
-      id: `show-${dayIndex}-${shows.length}`,
+      id: stableId || `show-${dayIndex}-${shows.length}`,
       time: time.toLowerCase().replace('H', 'h'), // Chuẩn hóa: 20H -> 20h
       showName,
       lionCount: parsedLionCount,

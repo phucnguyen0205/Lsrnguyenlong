@@ -12,26 +12,45 @@ import { fetchSheetData, loadRegistrations, saveRegistrations } from './sheetSer
 function remapRegistrations(regs: Record<string, Show>, showDays: ShowDay[]): Record<string, Show> {
   const result: Record<string, Show> = {};
   let remapped = 0;
+  let unmatched = 0;
 
-  // Build map: dayId|showName -> Show mới nhất
-  const byShowName = new Map<string, Show>();
+  // Build map: dayId|time|showName -> Show mới nhất
+  const byKey = new Map<string, Show>();
   for (const day of showDays) {
     for (const show of day.shows) {
-      byShowName.set(`${day.id}|${show.showName}`, show);
+      const k = `${day.id}|${show.time}|${show.showName}`;
+      byKey.set(k, show);
     }
   }
 
-  // Bước 1: copy các entry đã có key mới
+  // Bước 1: remap từng entry
   for (const [k, v] of Object.entries(regs)) {
+    if (!v?.showName) {
+      result[k] = v;
+      continue;
+    }
     const dayId = k.split('-').slice(0, 3).join('-');
-    const newShow = byShowName.get(`${dayId}|${v.showName}`);
+
+    // Thử match với key dayId|time|showName trước
+    let newShow = byKey.get(`${dayId}|${v.time}|${v.showName}`);
+    let matchedByName = false;
+
+    // Nếu không khớp, tìm bằng dayId|showName (fallback)
+    if (!newShow) {
+      const candidates = Array.from(byKey.entries()).filter(([key]) =>
+        key.startsWith(dayId + '|') && key.endsWith('|' + v.showName)
+      );
+      if (candidates.length > 0) {
+        newShow = candidates[0][1];
+        matchedByName = true;
+      }
+    }
+
     if (newShow) {
       const newKey = `${dayId}-${newShow.id}`;
       if (newKey === k) {
-        // Đã là key mới
         result[k] = v;
       } else {
-        // Key cũ - merge roles với entry mới (nếu có)
         const existing = result[newKey];
         if (existing) {
           const mergedRoles = [...existing.roles];
@@ -47,22 +66,13 @@ function remapRegistrations(regs: Record<string, Show>, showDays: ShowDay[]): Re
         remapped++;
       }
     } else {
-      // Không tìm thấy show - giữ entry cũ
       result[k] = v;
+      unmatched++;
     }
   }
 
-  // Bước 2: thêm các show mới chưa có trong registrations (nếu có roles)
-  for (const [key, show] of byShowName.entries()) {
-    const newKey = `${show.id && key.split('|')[0]}-${show.id}`;
-    if (!result[newKey] && show.roles.length > 0) {
-      result[newKey] = show;
-    }
-  }
-
-  if (remapped > 0) {
-    console.log('[remap] Remapped', remapped, 'entries to new keys');
-  }
+  if (remapped > 0) console.log('[remap] Remapped', remapped, 'entries');
+  if (unmatched > 0) console.log('[remap] Unmatched (kept):', unmatched);
   return result;
 }
 
